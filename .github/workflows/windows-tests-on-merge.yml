@@ -1,4 +1,4 @@
-name: Verify outstanding PR Rust jobs
+name: Full Windows test suite on the merged tree
 on:
   push:
     branches: [diag/verify-open-pr-ci-20261125]
@@ -13,7 +13,7 @@ env:
 
 jobs:
   rust:
-    name: PR ${{ matrix.pr }} - Rust (${{ matrix.os }})
+    name: Rust (${{ matrix.os }})
     permissions:
       contents: read
     timeout-minutes: 60
@@ -21,14 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { pr: 5810, os: ubuntu-latest, sha: "20d948a1dc15dc6f5c1678e7ca23ef90ab401fc8" }
-          - { pr: 5810, os: macos-latest, sha: "20d948a1dc15dc6f5c1678e7ca23ef90ab401fc8" }
-          - { pr: 5810, os: windows-latest, sha: "20d948a1dc15dc6f5c1678e7ca23ef90ab401fc8" }
-          - { pr: 5842, os: macos-latest, sha: "4131ad2fb80055a9f0b86d420506aa28719368a7" }
-          - { pr: 5842, os: windows-latest, sha: "4131ad2fb80055a9f0b86d420506aa28719368a7" }
-          - { pr: 5915, os: ubuntu-latest, sha: "b0a287e758425ca659f701b970f01897f019b812" }
-          - { pr: 5915, os: macos-latest, sha: "b0a287e758425ca659f701b970f01897f019b812" }
-          - { pr: 5915, os: windows-latest, sha: "b0a287e758425ca659f701b970f01897f019b812" }
+          - { os: windows-latest, sha: "a56add66ea8bda64c8568fb7d990fa6963544986" }
     # Self-hosted runners (scripts/selfhost-runner) only for trusted events, and only while the
     # SELFHOSTED_RUNNERS repository variable is 'true': runs-on cannot fall back when none is online.
     runs-on: ${{ matrix.os == 'ubuntu-latest' && vars.SELFHOSTED_RUNNERS == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "openidea-selfhosted"]') || matrix.os }}
@@ -75,7 +68,7 @@ jobs:
         shell: bash
       - if: runner.os == 'Linux'
         run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      # Clippy runs in the unchanged CI job; give this cold runner its full slot for tests.
       # Test fixtures write LF files; keep Git from converting them on checkout.
       - run: git config --global core.autocrlf false
       - run: cargo nextest run --workspace --no-fail-fast
