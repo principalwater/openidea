@@ -1,0 +1,51 @@
+CASE=0 active=1 key=1
+equivalent 0: 1
+DOM 0:true
+equivalent 1: 1
+DOM 1:true
+equivalent 1: 0
+menu key=1 type=10 responder=NSKVONotifying_Workbench inside=0
+equivalent 0: 1
+DOM 0:true
+equivalent 1: 1
+DOM 1:true
+equivalent 1: 0
+menu key=1 type=10 responder=NSKVONotifying_Workbench inside=0
+CASE=1 active=1 key=1
+equivalent 0: 0
+menu key=0 type=10 responder=NSKVONotifying_Workbench inside=0
+equivalent 1: 0
+menu key=1 type=10 responder=NSKVONotifying_Workbench inside=0
+equivalent 0: 0
+menu key=0 type=10 responder=NSKVONotifying_Workbench inside=0
+equivalent 1: 0
+menu key=1 type=10 responder=NSKVONotifying_Workbench inside=0
+CASE=2 active=1 key=1
+equivalent 0: 0
+DOM 0:true
+equivalent 1: 0
+DOM 1:true
+equivalent 1: 0
+parent 1
+equivalent 0: 0
+DOM 0:true
+equivalent 1: 0
+DOM 1:true
+equivalent 1: 0
+parent 1
+CASE=3 active=1 key=1
+monitor 0 =>1
+DOM 0:true
+monitor 1 =>1
+DOM 1:true
+monitor 1 =>0
+equivalent 1: 0
+menu key=1 type=10 responder=NSKVONotifying_Workbench inside=0
+monitor 0 =>1
+DOM 0:true
+monitor 1 =>1
+DOM 1:true
+monitor 1 =>0
+equivalent 1: 0
+menu key=1 type=10 responder=NSKVONotifying_Workbench inside=0
+done
