@@ -15,12 +15,18 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - name: Build only the fixture's crate
-        run: cargo test -p ide-build --lib --no-run
+        shell: pwsh
+        run: |
+          $artifacts = cargo test -p ide-build --lib --no-run --message-format=json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $binary = $artifacts | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.executable -and $_.target.name -eq 'ide_build' } | Select-Object -First 1 -ExpandProperty executable
+          if (-not (Test-Path $binary)) { throw 'Missing fixture executable' }
+          "FIXTURE_BINARY=$binary" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Observe the two Gradle fixtures
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $binary = (Get-ChildItem -Path target/debug/deps -Filter 'ide_build-*.exe' | Select-Object -First 1).FullName
+          $binary = $env:FIXTURE_BINARY
           $names = @('builds_gradle_projects_with_javac_and_only_what_changed', 'leaves_gradle_projects_with_other_compilers_to_gradle')
           $children = @()
           foreach ($name in $names) {
