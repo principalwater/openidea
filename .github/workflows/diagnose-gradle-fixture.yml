@@ -1,0 +1,47 @@
+name: Diagnose Gradle fixture
+on:
+  push:
+    branches: [diag/gradle-windows-lifecycle]
+permissions:
+  contents: read
+jobs:
+  fixture:
+    if: github.repository == 'principalwater/openidea'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build only the fixture's crate
+        run: cargo test -p ide-build --lib --no-run
+      - name: Observe the two Gradle fixtures
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $binary = (Get-ChildItem -Path target/debug/deps -Filter 'ide_build-*.exe' | Select-Object -First 1).FullName
+          $names = @('builds_gradle_projects_with_javac_and_only_what_changed', 'leaves_gradle_projects_with_other_compilers_to_gradle')
+          $children = @()
+          foreach ($name in $names) {
+            $children += Start-Process -FilePath $binary -ArgumentList @("jbuild::tests::$name",'--exact','--nocapture') -PassThru -NoNewWindow -RedirectStandardOutput "$env:RUNNER_TEMP/$name-out.txt" -RedirectStandardError "$env:RUNNER_TEMP/$name-err.txt"
+          }
+          for ($i = 0; $i -lt 12; $i++) {
+            Start-Sleep 15
+            if (@($children | Where-Object { -not $_.HasExited }).Count -eq 0) { break }
+          }
+          foreach ($name in $names) {
+            Write-Host $name
+            Get-Content "$env:RUNNER_TEMP/$name-err.txt" -Tail 45
+            Get-Content "$env:RUNNER_TEMP/$name-out.txt" -Tail 6
+          }
+          if (@($children | Where-Object { -not $_.HasExited }).Count) {
+            $procs = Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(java|cmd|ide_build-.*)\.exe$' }
+            $procs | Select-Object Name,ProcessId,ParentProcessId | Format-Table
+            $procs | Where-Object { $_.Name -eq 'java.exe' } | ForEach-Object {
+              $role = if ($_.CommandLine -match 'GradleDaemon') {'Gradle daemon'} elseif ($_.CommandLine -match 'GradleMain') {'Gradle client'} else {'Java'}
+              Write-Host "$role PID $($_.ProcessId)"
+            }
+            throw 'Fixture still running after 180 seconds'
+          }
+          foreach ($p in $children) { if ($p.ExitCode -ne 0) { throw "Exit $($p.ExitCode)" } }

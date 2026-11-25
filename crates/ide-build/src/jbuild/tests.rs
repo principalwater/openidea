@@ -518,12 +518,14 @@ fn builds_gradle_projects_with_javac_and_only_what_changed() {
 
 #[test]
 fn leaves_gradle_projects_with_other_compilers_to_gradle() {
+    eprintln!("DIAG entering fixture");
     let Some(f) = Fixture::gradle(&[
         ("app/build.gradle", "apply plugin: 'groovy'\ndependencies { implementation project(':lib') }\n"),
         ("app/src/main/java/a/A.java", "package a;\npublic class A {}\n"),
     ]) else {
         return;
     };
+    eprintln!("DIAG fixture ready at {:?}", f.root);
     let jdk = |_: Option<u32>| None;
     let build = JavaBuild {
         root: &f.root,
@@ -536,8 +538,8 @@ fn leaves_gradle_projects_with_other_compilers_to_gradle() {
         jdk: &jdk,
     };
     let target = Target::Launch { module: &f.root.join("app"), test: false };
-    match build.build(target, BuildKind::Build, &CancellationToken::new(), &|_| {}) {
-        Ok(Built::Unsupported(reason)) => assert!(reason.contains("GroovyCompile"), "{reason}"),
+    match build.build(target, BuildKind::Build, &CancellationToken::new(), &|event| eprintln!("DIAG event {event:?}")) {
+        Ok(Built::Unsupported(reason)) => { eprintln!("DIAG unsupported {reason}"); assert!(reason.contains("GroovyCompile"), "{reason}"); },
         Ok(Built::Done(outputs)) => panic!("built: {outputs:?}"),
         Err(e) => panic!("{e:?}"),
     }
