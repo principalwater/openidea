@@ -1,4 +1,4 @@
-name: Verify current PostgreSQL CI and queued macOS jobs
+name: Retry the merged macOS Rust checks
 on:
   push:
     branches: [diag/verify-open-pr-ci-20261125-head]
@@ -13,7 +13,7 @@ env:
 
 jobs:
   rust:
-    name: PR ${{ matrix.pr }} - Rust (${{ matrix.os }})
+    name: Rust (${{ matrix.os }})
     permissions:
       contents: read
     timeout-minutes: 60
@@ -21,11 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { pr: 5810, os: ubuntu-latest, sha: "8fe4357fd33a0daf92711a7dbdda65aa80464d55" }
-          - { pr: 5810, os: macos-latest, sha: "8fe4357fd33a0daf92711a7dbdda65aa80464d55" }
-          - { pr: 5810, os: windows-latest, sha: "8fe4357fd33a0daf92711a7dbdda65aa80464d55" }
-          - { pr: 5842, os: macos-latest, sha: "4131ad2fb80055a9f0b86d420506aa28719368a7" }
-          - { pr: 5915, os: macos-latest, sha: "b0a287e758425ca659f701b970f01897f019b812" }
+          - { os: macos-latest, sha: "a56add66ea8bda64c8568fb7d990fa6963544986" }
     # Self-hosted runners (scripts/selfhost-runner) only for trusted events, and only while the
     # SELFHOSTED_RUNNERS repository variable is 'true': runs-on cannot fall back when none is online.
     runs-on: ${{ matrix.os == 'ubuntu-latest' && vars.SELFHOSTED_RUNNERS == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "openidea-selfhosted"]') || matrix.os }}
@@ -90,55 +86,3 @@ jobs:
       - name: Bindings and command snapshot are up to date
         if: runner.os == 'Linux'
         run: git diff --exit-code src/bindings.ts src-tauri/tests/commands.snap
-
-  server:
-    name: Remote server (linux musl)
-    timeout-minutes: 40
-    runs-on: ${{ vars.SELFHOSTED_RUNNERS == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "openidea-selfhosted"]') || 'ubuntu-latest' }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          repository: l0ng-ai/openidea
-          ref: 8fe4357fd33a0daf92711a7dbdda65aa80464d55
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-        with: { targets: x86_64-unknown-linux-musl }
-      - uses: Swatinem/rust-cache@v2
-        if: runner.environment != 'self-hosted'
-        with: { key: server-musl }
-      - name: Persistent Cargo target dir
-        if: runner.environment == 'self-hosted'
-        shell: bash
-        run: |
-          echo "CARGO_INCREMENTAL=1" >> "$GITHUB_ENV"
-          size=$(du -sm "$CARGO_TARGET_DIR" 2>/dev/null | cut -f1 || true)
-          if [ "${size:-0}" -gt 40000 ]; then
-            echo "$CARGO_TARGET_DIR is ${size} MB; clearing it"
-            rm -rf "$CARGO_TARGET_DIR"
-          fi
-      - run: dpkg -s musl-tools >/dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y musl-tools; }
-      - run: cargo build --locked -p ide-host --bin openidea-server --target x86_64-unknown-linux-musl
-      - run: '"${CARGO_TARGET_DIR:-target}/x86_64-unknown-linux-musl/debug/openidea-server" --version'
-
-  # The plugin SDK, the official plugins and the test fixtures build in their
-  # own workspaces (the root excludes them), so the jobs above don't see them.
-
-  catalog:
-    name: Text catalog
-    timeout-minutes: 15
-    runs-on: ${{ vars.SELFHOSTED_RUNNERS == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "openidea-selfhosted"]') || 'ubuntu-latest' }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          repository: l0ng-ai/openidea
-          ref: 8fe4357fd33a0daf92711a7dbdda65aa80464d55
-          persist-credentials: false
-      - uses: pnpm/action-setup@v5
-        with: { version: 11 }
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
-          package-manager-cache: ${{ runner.environment != 'self-hosted' }}
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest run src/platform/locales/textCatalog.test.ts
