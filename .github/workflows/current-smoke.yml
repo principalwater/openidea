@@ -1,7 +1,7 @@
-name: Verify outstanding PR 5915 language jobs
+name: Verify current PostgreSQL language smoke
 on:
   push:
-    branches: [diag/verify-open-pr-ci-20261125]
+    branches: [diag/verify-open-pr-ci-20261125-head]
 permissions:
   contents: read
 
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: l0ng-ai/openidea
-          ref: b0a287e758425ca659f701b970f01897f019b812
+          ref: 8fe4357fd33a0daf92711a7dbdda65aa80464d55
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -63,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [cpp, kotlin, php, python, rust, typescript]
+        language: [c, cpp, go, java, kotlin, php, python, rust, typescript]
     # Self-hosted runners (scripts/selfhost-runner) only for trusted events, and only while the
     # SELFHOSTED_RUNNERS repository variable is 'true': runs-on cannot fall back when none is online.
     runs-on: ${{ vars.SELFHOSTED_RUNNERS == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "openidea-selfhosted"]') || 'ubuntu-latest' }}
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: l0ng-ai/openidea
-          ref: b0a287e758425ca659f701b970f01897f019b812
+          ref: 8fe4357fd33a0daf92711a7dbdda65aa80464d55
           persist-credentials: false
       # Tool versions, shared with the evals (pnpm eval).
       - run: grep -E '^[A-Z0-9_]+=' .github/tool-versions.env >> "$GITHUB_ENV"
