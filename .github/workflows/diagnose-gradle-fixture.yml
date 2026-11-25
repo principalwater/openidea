@@ -12,6 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: e21175d45b59cdacf971d31ca339c30627a7ea56
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - name: Build only the fixture's crate
