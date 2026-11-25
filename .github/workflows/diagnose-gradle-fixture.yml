@@ -48,12 +48,6 @@ jobs:
               $role = if ($_.CommandLine -match 'GradleDaemon') {'Gradle daemon'} elseif ($_.CommandLine -match 'GradleMain') {'Gradle client'} else {'Java'}
               Write-Host "$role PID $($_.ProcessId)"
             }
-            $client = Get-Command gradle
-            & $client.Source --stop
-            foreach ($p in $children) { if (-not $p.WaitForExit(90000)) { throw 'Fixture is still running after stopping the daemon' } }
-            foreach ($name in $names) {
-              Get-Content "$env:RUNNER_TEMP/$name-err.txt" -Tail 6
-              Get-Content "$env:RUNNER_TEMP/$name-out.txt" -Tail 5
-            }
+            throw 'Fixture exceeded 180s with its daemon disabled'
           }
           foreach ($p in $children) { if ($p.ExitCode -ne 0) { throw "Exit $($p.ExitCode)" } }
