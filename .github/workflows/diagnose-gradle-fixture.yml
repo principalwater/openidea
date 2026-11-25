@@ -28,26 +28,21 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $binary = $env:FIXTURE_BINARY
           $names = @('builds_gradle_projects_with_javac_and_only_what_changed', 'leaves_gradle_projects_with_other_compilers_to_gradle')
-          $children = @()
-          foreach ($name in $names) {
-            $children += Start-Process -FilePath $binary -ArgumentList @("jbuild::tests::$name",'--exact','--nocapture') -PassThru -NoNewWindow -RedirectStandardOutput "$env:RUNNER_TEMP/$name-out.txt" -RedirectStandardError "$env:RUNNER_TEMP/$name-err.txt"
-          }
-          for ($i = 0; $i -lt 12; $i++) {
-            Start-Sleep 15
-            if (@($children | Where-Object { -not $_.HasExited }).Count -eq 0) { break }
-          }
-          foreach ($name in $names) {
-            Write-Host $name
-            Get-Content "$env:RUNNER_TEMP/$name-err.txt" -Tail 45
-            Get-Content "$env:RUNNER_TEMP/$name-out.txt" -Tail 6
-          }
-          if (@($children | Where-Object { -not $_.HasExited }).Count) {
-            $procs = Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(java|cmd|ide_build-.*)\.exe$' }
-            $procs | Select-Object Name,ProcessId,ParentProcessId | Format-Table
-            $procs | Where-Object { $_.Name -eq 'java.exe' } | ForEach-Object {
-              $role = if ($_.CommandLine -match 'GradleDaemon') {'Gradle daemon'} elseif ($_.CommandLine -match 'GradleMain') {'Gradle client'} else {'Java'}
-              Write-Host "$role PID $($_.ProcessId)"
+          if (-not (Get-Command gradle) -or -not (Test-Path "$env:JAVA_HOME/bin/java.exe")) { throw 'Missing fixture toolchain' }
+          $env:GRADLE_USER_HOME = Join-Path $env:RUNNER_TEMP 'gradle-fixture-home'
+          for ($iteration = 1; $iteration -le 3; $iteration++) {
+            $children = @()
+            foreach ($name in $names) {
+              $children += Start-Process -FilePath $binary -ArgumentList @("jbuild::tests::$name",'--exact','--nocapture') -PassThru -NoNewWindow -RedirectStandardOutput "$env:RUNNER_TEMP/$name-out.txt" -RedirectStandardError "$env:RUNNER_TEMP/$name-err.txt"
             }
-            throw 'Fixture exceeded 180s with its daemon disabled'
+            foreach ($child in $children) { if (-not $child.WaitForExit(240000)) { throw "Test still running in iteration $iteration" } }
+            foreach ($name in $names) {
+              $log = Get-Content "$env:RUNNER_TEMP/$name-out.txt" -Raw
+              Write-Host "$iteration $name $log"
+              if ($log -notmatch '1 passed; 0 failed' -or (Select-String 'skipped: needs' "$env:RUNNER_TEMP/$name-err.txt" -Quiet)) { throw 'Expected an executed, passing fixture' }
+            }
+            foreach ($child in $children) { if ($child.ExitCode -ne 0) { throw "Exit $($child.ExitCode)" } }
           }
-          foreach ($p in $children) { if ($p.ExitCode -ne 0) { throw "Exit $($p.ExitCode)" } }
+          $status = (& gradle --status | Out-String)
+          if ($LASTEXITCODE -ne 0 -or $status -match '(?m)^\s*\d+\s+(IDLE|BUSY)') { throw $status }
+          Write-Host $status

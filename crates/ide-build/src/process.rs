@@ -194,8 +194,6 @@ fn run_with_env_capture(
     }
     let mut child =
         command.spawn().map_err(|e| IdeError::unavailable(format!("cannot start {}: {e}", program.display())))?;
-    eprintln!("DIAG spawned {program:?} pid={}", child.id());
-    let mut child_exit_seen = false;
     let (tx, rx) = line_queue();
     let pump = |stream: Box<dyn Read + Send>, kind: Stream, tx: mpsc::SyncSender<Line>| {
         std::thread::spawn(move || {
@@ -276,12 +274,7 @@ fn run_with_env_capture(
                     }
                 }
             }
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                if !child_exit_seen && let Ok(Some(status)) = child.try_wait() {
-                    child_exit_seen = true;
-                    eprintln!("DIAG child exited {status} but capture is still open, pid={}",child.id());
-                }
-            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
     }
